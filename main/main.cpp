@@ -13,13 +13,13 @@
 #include "controller/Ds4Controller.h"
 #include "lights/GpioLights.h"
 #include "motor/Drv8837Motor.h"
-#include "steering/Sg90Steering.h"
+#include "steering/ServoSteering.h"
 
 namespace {
-    constexpr char TAG[] = "Rastar";
+constexpr char TAG[] = "Rastar";
 
-    Ds4Controller controller;
-    Car* carInstance = nullptr;
+Ds4Controller controller;
+Car* carInstance = nullptr;
 
 }  // namespace
 
@@ -109,6 +109,7 @@ static struct uni_platform* getMyPlatform() {
 
 static void carTask(void*) {
     bool wasConnected = false;
+    int logCounter = 0;
 
     for (;;) {
         if (!carInstance) {
@@ -141,6 +142,14 @@ static void carTask(void*) {
 
         carInstance->update();
 
+        logCounter++;
+
+        if (logCounter >= 50) {
+            logCounter = 0;
+            ESP_LOGI("Car", "connected=%d steering=%.2f throttle=%.2f reverse=%.2f", state.connected, state.steering,
+                     state.throttle, state.reverse);
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -150,7 +159,7 @@ static void carTask(void*) {
 //
 
 extern "C" void app_main(void) {
-    static Sg90Steering steering({
+    static ServoSteering steering({
         .pin = Pins::SteeringServo,
         .channel = Pins::SteeringChannel,
     });

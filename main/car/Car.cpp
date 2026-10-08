@@ -1,7 +1,6 @@
 #include "Car.h"
 #include <algorithm>
 #include "esp_timer.h"
-#include "esp_log.h"
 
 Car::Car(ISteering& s, IMotor& m, ILights& l) : steering_(s), motor_(m), lights_(l) {}
 uint32_t Car::nowMs() {
@@ -9,15 +8,12 @@ uint32_t Car::nowMs() {
 }
 void Car::steer(float p) {
     steering_.setPosition(p);
-    ESP_LOGI("Car", "Steer %d", p);
 }
 void Car::forward(float p) {
     requestDrive(Direction::Forward, p);
-    ESP_LOGI("Car", "Forward %d", p);
 }
 void Car::reverse(float p) {
     requestDrive(Direction::Reverse, p);
-    ESP_LOGI("Car", "Reverse %d", p);
 }
 void Car::stop() {
     requestedDirection_ = Direction::Stopped;
@@ -31,7 +27,6 @@ void Car::stop() {
         motor_.stop();
         lightsOff();
     }
-    ESP_LOGI("Car", "Stop");
 }
 void Car::stopImmediate() {
     motor_.stop();

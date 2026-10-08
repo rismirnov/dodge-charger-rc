@@ -1,10 +1,11 @@
 #include "Ds4Controller.h"
+#include "esp_log.h"
 #include <algorithm>
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 
 namespace {
-    portMUX_TYPE StateMux = portMUX_INITIALIZER_UNLOCKED;
+portMUX_TYPE StateMux = portMUX_INITIALIZER_UNLOCKED;
 }
 
 float Ds4Controller::normalizeAxis(int32_t value) {

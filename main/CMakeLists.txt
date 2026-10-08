@@ -5,7 +5,7 @@ idf_component_register(
         "controller/Ds4Controller.cpp"
         "lights/GpioLights.cpp"
         "motor/Drv8837Motor.cpp"
-        "steering/Sg90Steering.cpp"
+        "steering/ServoSteering.cpp"
 
     INCLUDE_DIRS
         "."

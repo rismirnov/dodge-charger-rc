@@ -24,7 +24,7 @@ Bluepad32 Arduino API
 Ds4Controller
     ↓ ControllerState
 Car
- ├── Sg90Steering
+ ├── ServoSteering
  ├── Drv8837Motor
  └── GpioLights
 ```
@@ -55,7 +55,7 @@ R2/L2 для движения не используются.
 
 | Назначение | GPIO |
 |---|---:|
-| SG90 | 18 |
+| Servo | 18 |
 | DRV8837 IN1 | 25 |
 | DRV8837 IN2 | 26 |
 | DRV8837 nSLEEP | 27 |
@@ -65,7 +65,7 @@ R2/L2 для движения не используются.
 LEDC
 │
 ├── TIMER_0
-│    └── CHANNEL_0 → GPIO18 → SG90
+│    └── CHANNEL_0 → GPIO18 → Servo
 │                    50 Hz
 │
 └── TIMER_1
