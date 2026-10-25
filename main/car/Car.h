@@ -1,38 +1,57 @@
 #pragma once
+
 #include <cstdint>
-#include "../lights/ILights.h"
-#include "../motor/IMotor.h"
-#include "../steering/ISteering.h"
+#include "steering/ISteering.h" // Укажите ваши правильные пути к интерфейсам
+#include "motor/IMotor.h"
+#include "lights/ILights.h"
+#include "audio/ISoundManager.h"
 
 class Car {
-   public:
-    Car(ISteering& steering, IMotor& motor, ILights& lights);
-    void steer(float position);
-    void forward(float power);
-    void reverse(float power);
+public:
+    enum class Direction {
+        Stopped,
+        Forward,
+        Reverse
+    };
+
+    Car(ISteering& s, IMotor& m, ILights& l, ISoundManager& sound);
+
+    void steer(float p);
+    void forward(float p);
+    void reverse(float p);
     void stop();
     void stopImmediate();
+    
     void centerSteering();
-    void setHeadlights(bool enabled);
-    void setRearLights(bool enabled);
+    void setHeadlights(bool e);
+    void setRearLights(bool e);
     void lightsOff();
-    void update();
 
-   private:
-    enum class Direction { Stopped, Forward, Reverse };
-    void requestDrive(Direction direction, float power);
-    void startRamp(float targetPower);
-    void startStopRamp();
+    void update(); // Вызывается каждые 10 мс из carTask
+
+private:
     void applyMotor();
-    static uint32_t nowMs();
+    void updatePowerFilter();       // Расчет плавного изменения мощности
+    void handleDirectionSwitch();    // Логика переключения направления на нулевой скорости
+    void updateLightsForDirection(); // Автоматическое переключение фар
+
     ISteering& steering_;
     IMotor& motor_;
     ILights& lights_;
-    Direction direction_ = Direction::Stopped, requestedDirection_ = Direction::Stopped;
-    float currentPower_ = 0, targetPower_ = 0;
-    bool ramping_ = false;
-    float rampFromPower_ = 0, rampToPower_ = 0;
-    uint32_t rampStartMs_ = 0;
-    static constexpr uint32_t StartTimeMs = 250, StopTimeMs = 180;
-    static constexpr float PowerEpsilon = 0.001f;
+    ISoundManager& sound_;
+
+    bool wasMoving_ = false;
+    bool soundInitialized_ = false;
+    Direction direction_ = Direction::Stopped;
+    Direction requestedDirection_ = Direction::Stopped;
+
+    float currentPower_ = 0.0f;
+    float targetPower_ = 0.0f;
+
+    static constexpr float PowerEpsilon = 0.02f;
+    
+    // Коэффициенты плавности (изменение мощности за 1 шаг в 10 мс)
+    // 0.05f означает, что от 0 до 100% машина разгонится за 20 шагов (200 мс)
+    static constexpr float MaxStepAccel = 0.05f; // Плавность разгона
+    static constexpr float MaxStepBrake = 0.10f; // Плавность торможения
 };

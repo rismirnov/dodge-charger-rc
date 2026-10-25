@@ -6,6 +6,8 @@ idf_component_register(
         "lights/GpioLights.cpp"
         "motor/Drv8837Motor.cpp"
         "steering/ServoSteering.cpp"
+        "audio/AudioPlayer.cpp"
+        "audio/SoundManager.cpp"
 
     INCLUDE_DIRS
         "."
@@ -13,4 +15,8 @@ idf_component_register(
     REQUIRES
         bluepad32
         btstack
+        driver
+        freertos
 )
+
+littlefs_create_partition_image(storage "${CMAKE_SOURCE_DIR}/data" FLASH_IN_PROJECT)

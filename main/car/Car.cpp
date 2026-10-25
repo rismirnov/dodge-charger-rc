@@ -1,150 +1,129 @@
-#include "Car.h"
-#include <algorithm>
-#include "esp_timer.h"
 
-Car::Car(ISteering& s, IMotor& m, ILights& l) : steering_(s), motor_(m), lights_(l) {}
-uint32_t Car::nowMs() {
-    return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+#include "Car.h"
+#include "audio/SoundManager.h"
+#include <algorithm>
+
+Car::Car(ISteering& steering, IMotor& motor, ILights& lights, ISoundManager& sound)
+    : steering_(steering), motor_(motor), lights_(lights), sound_(sound) {}
+
+void Car::steer(float position) {
+    steering_.setPosition(position);
 }
-void Car::steer(float p) {
-    steering_.setPosition(p);
+
+void Car::forward(float power) {
+    requestedDirection_ = Direction::Forward;
+    targetPower_ = std::clamp(power, 0.0f, 1.0f);
+    sound_.playCarMovement();
 }
-void Car::forward(float p) {
-    requestDrive(Direction::Forward, p);
+
+void Car::reverse(float power) {
+    requestedDirection_ = Direction::Reverse;
+    targetPower_ = std::clamp(power, 0.0f, 1.0f);
+    sound_.playCarMovement();
 }
-void Car::reverse(float p) {
-    requestDrive(Direction::Reverse, p);
-}
+
 void Car::stop() {
     requestedDirection_ = Direction::Stopped;
-    targetPower_ = 0;
-    if (currentPower_ > PowerEpsilon)
-        startStopRamp();
-    else {
-        currentPower_ = 0;
-        direction_ = Direction::Stopped;
-        ramping_ = false;
-        motor_.stop();
-        lightsOff();
-    }
+    targetPower_ = 0.0f;
+    sound_.stopCarMovement();
 }
+
 void Car::stopImmediate() {
+    requestedDirection_ = Direction::Stopped;
+    direction_ = Direction::Stopped;
+    targetPower_ = 0.0f;
+    currentPower_ = 0.0f;
+
     motor_.stop();
-    currentPower_ = targetPower_ = 0;
-    direction_ = requestedDirection_ = Direction::Stopped;
-    ramping_ = false;
     lightsOff();
+
+    sound_.stopCarMovement();
+    wasMoving_ = false;
 }
+
 void Car::centerSteering() {
     steering_.center();
 }
-void Car::setHeadlights(bool e) {
-    lights_.setHeadlights(e);
+
+void Car::setHeadlights(bool enabled) {
+    lights_.setHeadlights(enabled);
 }
-void Car::setRearLights(bool e) {
-    lights_.setRearLights(e);
+
+void Car::setRearLights(bool enabled) {
+    lights_.setRearLights(enabled);
 }
+
 void Car::lightsOff() {
     lights_.off();
 }
-void Car::requestDrive(Direction d, float p) {
-    p = std::clamp(p, 0.0f, 1.0f);
-    if (p <= PowerEpsilon) {
-        stop();
-        return;
+
+void Car::updatePowerFilter() {
+    const float activeTarget = requestedDirection_ == direction_ ? targetPower_ : 0.0f;
+
+    if (currentPower_ < activeTarget) {
+        currentPower_ = std::min(currentPower_ + MaxStepAccel, activeTarget);
+    } else if (currentPower_ > activeTarget) {
+        currentPower_ = std::max(currentPower_ - MaxStepBrake, activeTarget);
     }
-    requestedDirection_ = d;
-    targetPower_ = p;
-    if (direction_ == d && currentPower_ > PowerEpsilon) {
-        ramping_ = false;
-        currentPower_ = targetPower_;
-        applyMotor();
-        return;
-    }
-    if (currentPower_ <= PowerEpsilon) {
-        direction_ = d;
-        currentPower_ = 0;
-        startRamp(targetPower_);
-        if (direction_ == Direction::Forward) {
-            setHeadlights(true);
-            setRearLights(false);
-        } else {
-            setHeadlights(false);
-            setRearLights(true);
-        }
-        return;
-    }
-    startStopRamp();
 }
-void Car::startRamp(float p) {
-    ramping_ = true;
-    rampFromPower_ = currentPower_;
-    rampToPower_ = p;
-    rampStartMs_ = nowMs();
-}
-void Car::startStopRamp() {
-    if (currentPower_ <= PowerEpsilon) {
-        currentPower_ = 0;
-        ramping_ = false;
-        motor_.stop();
-        if (requestedDirection_ == Direction::Stopped) {
-            direction_ = Direction::Stopped;
-            lightsOff();
-        }
-        return;
+
+void Car::updateLightsForDirection() {
+    setHeadlights(true);
+
+    if (direction_ == Direction::Forward) {
+        setRearLights(false);
+    } else if (direction_ == Direction::Reverse) {
+        setRearLights(true);
     }
-    ramping_ = true;
-    rampFromPower_ = currentPower_;
-    rampToPower_ = 0;
-    rampStartMs_ = nowMs();
 }
-void Car::update() {
-    if (requestedDirection_ != direction_ && currentPower_ > PowerEpsilon && !ramping_)
-        startStopRamp();
-    if (!ramping_)
-        return;
-    const uint32_t elapsed = nowMs() - rampStartMs_;
-    const bool stopping = rampToPower_ < rampFromPower_;
-    const uint32_t duration = stopping ? StopTimeMs : StartTimeMs;
-    float progress = static_cast<float>(elapsed) / static_cast<float>(duration);
-    progress = std::clamp(progress, 0.0f, 1.0f);
-    currentPower_ = rampFromPower_ + (rampToPower_ - rampFromPower_) * progress;
-    applyMotor();
-    if (progress < 1)
-        return;
-    currentPower_ = rampToPower_;
-    ramping_ = false;
-    if (currentPower_ <= PowerEpsilon) {
-        currentPower_ = 0;
-        motor_.stop();
-        if (requestedDirection_ != Direction::Stopped) {
-            direction_ = requestedDirection_;
-            if (direction_ == Direction::Forward) {
-                setHeadlights(true);
-                setRearLights(false);
-            } else if (direction_ == Direction::Reverse) {
-                setHeadlights(false);
-                setRearLights(true);
-            }
-            startRamp(targetPower_);
-        } else {
-            direction_ = Direction::Stopped;
-            lightsOff();
-        }
-        return;
+
+void Car::handleDirectionSwitch() {
+    currentPower_ = 0.0f;
+    motor_.stop();
+
+    const bool directionChanged = requestedDirection_ != direction_;
+
+    const bool shouldDrive = requestedDirection_ != Direction::Stopped;
+
+    if (shouldDrive && directionChanged) {
+        direction_ = requestedDirection_;
+        updateLightsForDirection();
+    } else if (requestedDirection_ == Direction::Stopped) {
+        direction_ = Direction::Stopped;
+        setRearLights(false);
     }
-    applyMotor();
 }
+
 void Car::applyMotor() {
     switch (direction_) {
         case Direction::Forward:
             motor_.forward(currentPower_);
             break;
+
         case Direction::Reverse:
             motor_.reverse(currentPower_);
             break;
+
         case Direction::Stopped:
             motor_.stop();
             break;
     }
+}
+
+void Car::update() {
+    // Запускаем звук двигателя один раз.
+    if (!soundInitialized_) {
+        sound_.playEngineStart();
+        soundInitialized_ = true;
+    }
+
+    updatePowerFilter();
+
+    if (currentPower_ > PowerEpsilon) {
+        applyMotor();
+    } else {
+        handleDirectionSwitch();
+    }
+    
+    wasMoving_ = currentPower_ > PowerEpsilon;
 }

@@ -45,8 +45,8 @@ void Ds4Controller::onControllerData(uni_hid_device_t* d, const uni_controller_t
     const uni_gamepad_t& g = c->gamepad;
     const bool a = (g.buttons & BUTTON_A) != 0, b = (g.buttons & BUTTON_B) != 0, x = (g.buttons & BUTTON_X) != 0,
                y = (g.buttons & BUTTON_Y) != 0;
-    state_.steering = normalizeAxis(g.axis_x);
-    const float drive = normalizeAxis(g.axis_ry);
+    state_.steering = normalizeAxis(g.axis_rx);
+    const float drive = normalizeAxis(g.axis_y);
     if (drive < 0) {
         state_.throttle = -drive;
         state_.reverse = 0;

@@ -6,7 +6,8 @@ constexpr ledc_mode_t Mode = LEDC_LOW_SPEED_MODE;
 constexpr ledc_timer_bit_t Resolution = LEDC_TIMER_14_BIT;
 // MaxDuty соответствует 14-bit PWM разрешению.
 constexpr uint32_t MaxDuty = (1u << 14) - 1; // 16383
-constexpr float MaxPosition = 0.35f;
+constexpr float MaxPosition = 0.61f;
+constexpr float CenterPosition = -0.33f;
 }  // namespace
 ServoSteering::ServoSteering(const Config& config) : config_(config) {}
 void ServoSteering::init() {
@@ -37,7 +38,10 @@ void ServoSteering::setPulse(float pulseUs) {
 }
 void ServoSteering::setPosition(float position) {
     position = std::clamp(position, -1.0f, 1.0f);
-    position *= MaxPosition;
+    position = CenterPosition + position * MaxPosition;
+    position = std::clamp(position, -1.0f, 1.0f);
+    
+    position = -position;
     
     const float pulseUs = position < 0
                               ? config_.centerPulseUs + position * (config_.centerPulseUs - config_.minPulseUs)
@@ -45,5 +49,5 @@ void ServoSteering::setPosition(float position) {
     setPulse(pulseUs);
 }
 void ServoSteering::center() {
-    setPulse(config_.centerPulseUs);
+    setPosition(0.0);
 }

@@ -7,7 +7,6 @@ class Drv8837Motor : public IMotor {
     struct Config {
         gpio_num_t in1;
         gpio_num_t in2;
-        gpio_num_t sleep;
         ledc_channel_t in1Channel;
         ledc_channel_t in2Channel;
         uint32_t pwmFrequency;
@@ -21,5 +20,6 @@ class Drv8837Motor : public IMotor {
    private:
     void setDuty(ledc_channel_t channel, uint32_t duty);
     void setSpeed(float speed);
+    bool is_moving = false;
     Config config_;
 };
